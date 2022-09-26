@@ -11,13 +11,6 @@ use cortex_m_rt::entry;
 use embedded_hal::digital::v2::{StatefulOutputPin, ToggleableOutputPin};
 use stm32f3xx_hal::{gpio, pac, prelude::*};
 
-// `unwrap_infallible` provides an `into_ok` method on `Result`, but only for `!` not `Infallible`, and there's no
-// `Into` impl :(
-fn into_ok<T>(x: Result<T, Infallible>) -> T {
-    let Ok(res) = x;
-    res
-}
-
 // Type alias to reduce boilerplate.
 type LED<const PIN: u8> = gpio::Pin<gpio::Gpioe, gpio::U<PIN>, gpio::Output<gpio::PushPull>>;
 // Combination of useful traits to allow returning an LED with an arbitrary type-level index.
@@ -71,7 +64,7 @@ fn sleep(seconds: f32) {
 
 struct Button {
     pin: gpio::Pin<gpio::Gpioa, gpio::Ux, gpio::Input>,
-    handled: bool
+    handled: bool,
 }
 impl Button {
     fn new(pin: gpio::Pin<gpio::Gpioa, gpio::Ux, gpio::Input>) -> Button {
@@ -79,13 +72,14 @@ impl Button {
     }
 
     fn is_pressed(&self) -> bool {
-        into_ok(self.pin.is_high())
+        let Ok(x) = self.pin.is_high();
+        return x;
     }
     fn handle_pressed(&mut self) -> bool {
         if self.is_pressed() {
-            if !self.handled  {
+            if !self.handled {
                 self.handled = true;
-                return true
+                return true;
             }
         } else if !self.is_pressed() {
             if self.handled {
@@ -101,7 +95,12 @@ struct Buttons {
 impl Buttons {
     fn new(mut gpioa: gpio::gpioa::Parts, _exti: &mut pac::EXTI) -> Buttons {
         Buttons {
-            user: Button::new(gpioa.pa0.into_pull_down_input(&mut gpioa.moder, &mut gpioa.pupdr).downgrade())
+            user: Button::new(
+                gpioa
+                    .pa0
+                    .into_pull_down_input(&mut gpioa.moder, &mut gpioa.pupdr)
+                    .downgrade(),
+            ),
         }
     }
 }
