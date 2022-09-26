@@ -13,14 +13,8 @@ use stm32f3xx_hal::{gpio, pac, prelude::*};
 // Type alias to reduce boilerplate.
 type LED<const PIN: u8> = gpio::Pin<gpio::Gpioe, gpio::U<PIN>, gpio::Output<gpio::PushPull>>;
 // Combination of useful traits to allow returning an LED with an arbitrary type-level index.
-trait LEDTrait:
-    ToggleableOutputPin<Error = Infallible> + StatefulOutputPin<Error = Infallible>
-{
-}
-impl<T: ToggleableOutputPin<Error = Infallible> + StatefulOutputPin<Error = Infallible>> LEDTrait
-    for T
-{
-}
+trait LEDTrait: ToggleableOutputPin<Error = Infallible> + StatefulOutputPin<Error = Infallible> {}
+impl<T: ToggleableOutputPin<Error = Infallible> + StatefulOutputPin<Error = Infallible>> LEDTrait for T {}
 
 struct LEDWheel {
     nw: LED<8>,
@@ -37,30 +31,14 @@ impl LEDWheel {
 
     fn new(mut gpioe: gpio::gpioe::Parts) -> LEDWheel {
         LEDWheel {
-            nw: gpioe
-                .pe8
-                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            n: gpioe
-                .pe9
-                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            ne: gpioe
-                .pe10
-                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            e: gpioe
-                .pe11
-                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            se: gpioe
-                .pe12
-                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            s: gpioe
-                .pe13
-                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            sw: gpioe
-                .pe14
-                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            w: gpioe
-                .pe15
-                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            nw: gpioe.pe8.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            n: gpioe.pe9.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            ne: gpioe.pe10.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            e: gpioe.pe11.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            se: gpioe.pe12.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            s: gpioe.pe13.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            sw: gpioe.pe14.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            w: gpioe.pe15.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
         }
     }
 
@@ -92,9 +70,7 @@ fn main() -> ! {
     let mut led_wheel = LEDWheel::new(gpioe);
 
     let mut gpioa = peripherals.GPIOA.split(&mut reset_and_clock_control.ahb);
-    let user_button = gpioa
-        .pa0
-        .into_pull_down_input(&mut gpioa.moder, &mut gpioa.pupdr);
+    let user_button = gpioa.pa0.into_pull_down_input(&mut gpioa.moder, &mut gpioa.pupdr);
 
     // Start here so that we loop round to 0 on the first iteration.
     let mut index: usize = LEDWheel::COUNT - 1;
