@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![feature(exhaustive_patterns)]
 
 use core::convert::Infallible;
 
@@ -9,6 +10,13 @@ use cortex_m::asm;
 use cortex_m_rt::entry;
 use embedded_hal::digital::v2::{StatefulOutputPin, ToggleableOutputPin};
 use stm32f3xx_hal::{gpio, pac, prelude::*};
+
+// `unwrap_infallible` provides an `into_ok` method on `Result`, but only for `!` not `Infallible`, and there's no
+// `Into` impl :(
+fn into_ok<T>(x: Result<T, Infallible>) -> T {
+    let Ok(res) = x;
+    res
+}
 
 // Type alias to reduce boilerplate.
 type LED<const PIN: u8> = gpio::Pin<gpio::Gpioe, gpio::U<PIN>, gpio::Output<gpio::PushPull>>;
@@ -87,8 +95,8 @@ fn main() -> ! {
         }
         let next_index = ((index as i8 + delta) % LEDWheel::COUNT as i8) as usize;
 
-        led_wheel.by_index(next_index).set_high().unwrap();
-        led_wheel.by_index(index).set_low().unwrap();
+        let Ok(_) = led_wheel.by_index(next_index).set_high();
+        let Ok(_) = led_wheel.by_index(index).set_low();
         index = next_index;
         sleep(0.25);
     }
