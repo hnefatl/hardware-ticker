@@ -55,6 +55,10 @@ impl LEDWheel {
     }
 }
 
+fn sleep(seconds: f32) {
+    asm::delay((seconds * 8_000_000f32) as u32)
+}
+
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().unwrap();
@@ -68,6 +72,6 @@ fn main() -> ! {
         led_wheel.by_index(index + 1).set_high().unwrap();
         led_wheel.by_index(index).set_low().unwrap();
         index += 1;
-        asm::delay(2_000_000);
+        sleep(0.25);
     }
 }
