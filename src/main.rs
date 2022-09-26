@@ -3,11 +3,14 @@
 #![feature(exhaustive_patterns)]
 #![feature(stmt_expr_attributes)]
 
+use core::ops::DerefMut;
+
 use panic_halt as _;
 
 use cortex_m::asm;
 use cortex_m_rt::entry;
 use stm32f3xx_hal::{pac, prelude::*};
+use cortex_m::interrupt::free;
 
 mod led_wheel;
 use led_wheel::LEDWheel;
@@ -24,19 +27,25 @@ fn main() -> ! {
     let mut peripherals = pac::Peripherals::take().unwrap();
 
     let mut reset_and_clock_control = peripherals.RCC.constrain();
+    let mut syscfg = peripherals.SYSCFG.constrain(&mut reset_and_clock_control.apb2);
+
     let gpioe = peripherals.GPIOE.split(&mut reset_and_clock_control.ahb);
     let mut led_wheel = LEDWheel::new(gpioe);
 
     let gpioa = peripherals.GPIOA.split(&mut reset_and_clock_control.ahb);
-    let mut buttons = Buttons::new(gpioa, &mut peripherals.EXTI);
+    let buttons = Buttons::init(gpioa, &mut peripherals.EXTI, &mut syscfg);
 
     // Start here so that we loop round to 0 on the first iteration.
     let mut index: usize = LEDWheel::COUNT - 1;
     let mut delta: i8 = 1;
     loop {
-        if buttons.user.handle_pressed() {
-            delta *= -1;
-        }
+        free(|cs| {
+            if let Some(buttons) = buttons.borrow(cs).borrow_mut().deref_mut() {
+                if buttons.user.handle_pressed() {
+                    delta *= -1;
+                }
+            }
+        });
         let next_index = ((index as i8 + delta) % LEDWheel::COUNT as i8) as usize;
 
         let Ok(_) = led_wheel.by_index(next_index).set_high();
