@@ -2,49 +2,43 @@
 #![no_main]
 #![feature(exhaustive_patterns)]
 
-use core::convert::Infallible;
-
 use panic_halt as _;
 
 use cortex_m::asm;
 use cortex_m_rt::entry;
-use embedded_hal::digital::v2::{StatefulOutputPin, ToggleableOutputPin};
 use stm32f3xx_hal::{gpio, pac, prelude::*};
 
 // Type alias to reduce boilerplate.
-type LED<const PIN: u8> = gpio::Pin<gpio::Gpioe, gpio::U<PIN>, gpio::Output<gpio::PushPull>>;
-// Combination of useful traits to allow returning an LED with an arbitrary type-level index.
-trait LEDTrait: ToggleableOutputPin<Error = Infallible> + StatefulOutputPin<Error = Infallible> {}
-impl<T: ToggleableOutputPin<Error = Infallible> + StatefulOutputPin<Error = Infallible>> LEDTrait for T {}
+type LED = gpio::Pin<gpio::Gpioe, gpio::Ux, gpio::Output<gpio::PushPull>>;
 
 struct LEDWheel {
-    nw: LED<8>,
-    n: LED<9>,
-    ne: LED<10>,
-    e: LED<11>,
-    se: LED<12>,
-    s: LED<13>,
-    sw: LED<14>,
-    w: LED<15>,
+    nw: LED,
+    n: LED,
+    ne: LED,
+    e: LED,
+    se: LED,
+    s: LED,
+    sw: LED,
+    w: LED,
 }
 impl LEDWheel {
     const COUNT: usize = 8;
 
     fn new(mut gpioe: gpio::gpioe::Parts) -> LEDWheel {
         LEDWheel {
-            nw: gpioe.pe8.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            n: gpioe.pe9.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            ne: gpioe.pe10.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            e: gpioe.pe11.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            se: gpioe.pe12.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            s: gpioe.pe13.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            sw: gpioe.pe14.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            w: gpioe.pe15.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            nw: gpioe.pe8.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper).downgrade(),
+            n: gpioe.pe9.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper).downgrade(),
+            ne: gpioe.pe10.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper).downgrade(),
+            e: gpioe.pe11.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper).downgrade(),
+            se: gpioe.pe12.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper).downgrade(),
+            s: gpioe.pe13.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper).downgrade(),
+            sw: gpioe.pe14.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper).downgrade(),
+            w: gpioe.pe15.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper).downgrade(),
         }
     }
 
-    fn by_index(&mut self, index: usize) -> &mut dyn LEDTrait {
-        let leds: [&mut dyn LEDTrait; Self::COUNT] = [
+    fn by_index(&mut self, index: usize) -> &mut LED {
+        let leds: [&mut LED; Self::COUNT] = [
             &mut self.n,
             &mut self.ne,
             &mut self.e,
