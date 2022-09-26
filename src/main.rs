@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(exhaustive_patterns)]
+#![feature(stmt_expr_attributes)]
 
 use panic_halt as _;
 
@@ -25,6 +26,7 @@ impl LEDWheel {
     const COUNT: usize = 8;
 
     fn new(mut gpioe: gpio::gpioe::Parts) -> LEDWheel {
+        #[rustfmt::skip]
         LEDWheel {
             nw: gpioe.pe8.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper).downgrade(),
             n: gpioe.pe9.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper).downgrade(),
