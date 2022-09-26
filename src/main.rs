@@ -6,15 +6,21 @@ use core::convert::Infallible;
 use panic_halt as _;
 
 use cortex_m::asm;
-use embedded_hal::digital::v2::{ToggleableOutputPin, StatefulOutputPin};
 use cortex_m_rt::entry;
+use embedded_hal::digital::v2::{StatefulOutputPin, ToggleableOutputPin};
 use stm32f3xx_hal::{gpio, pac, prelude::*};
 
 // Type alias to reduce boilerplate.
 type LED<const PIN: u8> = gpio::Pin<gpio::Gpioe, gpio::U<PIN>, gpio::Output<gpio::PushPull>>;
 // Combination of useful traits to allow returning an LED with an arbitrary type-level index.
-trait LEDTrait: ToggleableOutputPin<Error = Infallible> + StatefulOutputPin<Error = Infallible> {}
-impl<T: ToggleableOutputPin<Error = Infallible> + StatefulOutputPin<Error = Infallible>> LEDTrait for T {}
+trait LEDTrait:
+    ToggleableOutputPin<Error = Infallible> + StatefulOutputPin<Error = Infallible>
+{
+}
+impl<T: ToggleableOutputPin<Error = Infallible> + StatefulOutputPin<Error = Infallible>> LEDTrait
+    for T
+{
+}
 
 struct LEDWheel {
     nw: LED<8>,
@@ -27,21 +33,39 @@ struct LEDWheel {
     w: LED<15>,
 }
 impl LEDWheel {
+    const COUNT: usize = 8;
+
     fn new(mut gpioe: gpio::gpioe::Parts) -> LEDWheel {
         LEDWheel {
-            nw: gpioe.pe8.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            n: gpioe.pe9.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            ne: gpioe.pe10.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            e: gpioe.pe11.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            se: gpioe.pe12.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            s: gpioe.pe13.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            sw: gpioe.pe14.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
-            w: gpioe.pe15.into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            nw: gpioe
+                .pe8
+                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            n: gpioe
+                .pe9
+                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            ne: gpioe
+                .pe10
+                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            e: gpioe
+                .pe11
+                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            se: gpioe
+                .pe12
+                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            s: gpioe
+                .pe13
+                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            sw: gpioe
+                .pe14
+                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
+            w: gpioe
+                .pe15
+                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
         }
     }
 
     fn by_index(&mut self, index: usize) -> &mut dyn LEDTrait {
-        let leds: [&mut dyn LEDTrait; 8] = [
+        let leds: [&mut dyn LEDTrait; Self::COUNT] = [
             &mut self.n,
             &mut self.ne,
             &mut self.e,
@@ -67,11 +91,29 @@ fn main() -> ! {
     let gpioe = peripherals.GPIOE.split(&mut reset_and_clock_control.ahb);
     let mut led_wheel = LEDWheel::new(gpioe);
 
-    let mut index = 0;
+    let mut gpioa = peripherals.GPIOA.split(&mut reset_and_clock_control.ahb);
+    let user_button = gpioa
+        .pa0
+        .into_pull_down_input(&mut gpioa.moder, &mut gpioa.pupdr);
+
+    // Start here so that we loop round to 0 on the first iteration.
+    let mut index: usize = LEDWheel::COUNT - 1;
+    let mut delta: i8 = 1;
+    let mut button_is_pressed = false;
     loop {
-        led_wheel.by_index(index + 1).set_high().unwrap();
+        if user_button.is_high().unwrap_or(false) {
+            if !button_is_pressed {
+                button_is_pressed = true;
+                delta *= -1;
+            }
+        } else {
+            button_is_pressed = false;
+        }
+        let next_index = ((index as i8 + delta) % LEDWheel::COUNT as i8) as usize;
+
+        led_wheel.by_index(next_index).set_high().unwrap();
         led_wheel.by_index(index).set_low().unwrap();
-        index += 1;
+        index = next_index;
         sleep(0.25);
     }
 }
