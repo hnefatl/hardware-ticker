@@ -1,6 +1,6 @@
-use core::{cell::RefCell, ops::DerefMut};
+use core::cell::RefCell;
 
-use cortex_m::interrupt::{free, Mutex};
+use cortex_m::interrupt::{free, CriticalSection, Mutex};
 use stm32f3xx_hal::{gpio, interrupt, pac, syscfg};
 
 pub struct Button {
@@ -26,7 +26,7 @@ impl Buttons {
         mut gpioa: gpio::gpioa::Parts,
         exti: &mut pac::EXTI,
         syscfg: &mut syscfg::SysCfg,
-    ) -> &'static Mutex<RefCell<Option<Buttons>>> {
+    ) -> &'static ButtonsContainer {
         let mut result = Buttons {
             user: Button::new(
                 gpioa
@@ -45,35 +45,38 @@ impl Buttons {
         unsafe { cortex_m::peripheral::NVIC::unmask(result.user.pin.interrupt()) }
 
         // Update the global store.
-        free(|cs| BUTTONS.borrow(cs).replace(Some(result)));
+        free(|cs| BUTTONS.update(cs, result));
 
         return &BUTTONS;
     }
 }
 
-// TODO: this would be a nice way of avoiding the borrow().borrow_mut().deref_mut() magic, but need to satisfy the
-// borrow checker first.
-//
-//struct ButtonsContainer(Mutex<RefCell<Option<Buttons>>>);
-//impl ButtonsContainer {
-//    pub fn borrow(&mut self, cs: &CriticalSection) -> &mut Option<Buttons> {
-//        self.0.borrow(cs).borrow_mut().deref_mut()
-//    }
-//
-//    fn update(&mut self, cs: &CriticalSection, new_buttons: Buttons) {
-//        self.borrow(cs).replace(new_buttons);
-//    }
-//}
-//
-//static BUTTONS: ButtonsContainer = ButtonsContainer(Mutex::new(RefCell::new(None)));
-static BUTTONS: Mutex<RefCell<Option<Buttons>>> = Mutex::new(RefCell::new(None));
+pub struct ButtonsContainer(Mutex<RefCell<Option<Buttons>>>);
+impl ButtonsContainer {
+    pub fn with_ref<F>(&self, cs: &CriticalSection, f: F)
+    where
+        F: FnOnce(&mut Buttons),
+    {
+        f(self.0.borrow(cs).borrow_mut().as_mut().unwrap())
+    }
+    pub fn with_ref_cs<F>(&self, f: F)
+    where
+        F: FnOnce(&mut Buttons),
+    {
+        free(|cs| self.with_ref(cs, f))
+    }
+
+    fn update(&self, cs: &CriticalSection, new_buttons: Buttons) {
+        self.0.borrow(cs).borrow_mut().replace(new_buttons);
+    }
+}
+
+static BUTTONS: ButtonsContainer = ButtonsContainer(Mutex::new(RefCell::new(None)));
 
 #[interrupt]
 fn EXTI0() {
-    free(|cs| {
-        if let Some(buttons) = BUTTONS.borrow(cs).borrow_mut().deref_mut() {
-            buttons.user.pin.clear_interrupt();
-            buttons.user.pressed = true;
-        }
+    BUTTONS.with_ref_cs(|buttons| {
+        buttons.user.pin.clear_interrupt();
+        buttons.user.pressed = true;
     });
 }

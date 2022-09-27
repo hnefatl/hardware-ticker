@@ -3,14 +3,11 @@
 #![feature(exhaustive_patterns)]
 #![feature(stmt_expr_attributes)]
 
-use core::ops::DerefMut;
-
 use panic_halt as _;
 
 use cortex_m::asm;
 use cortex_m_rt::entry;
 use stm32f3xx_hal::{pac, prelude::*};
-use cortex_m::interrupt::free;
 
 mod led_wheel;
 use led_wheel::LEDWheel;
@@ -39,11 +36,9 @@ fn main() -> ! {
     let mut index: usize = LEDWheel::COUNT - 1;
     let mut delta: i8 = 1;
     loop {
-        free(|cs| {
-            if let Some(buttons) = buttons.borrow(cs).borrow_mut().deref_mut() {
-                if buttons.user.handle_pressed() {
-                    delta *= -1;
-                }
+        buttons.with_ref_cs(|buttons| {
+            if buttons.user.handle_pressed() {
+                delta *= -1;
             }
         });
         let next_index = ((index as i8 + delta) % LEDWheel::COUNT as i8) as usize;
