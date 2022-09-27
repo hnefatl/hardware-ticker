@@ -12,6 +12,7 @@ impl Button {
         Button { pin, pressed: false }
     }
 
+    /// Return `true` if the button has been pressed _since the last call_.
     pub fn handle_pressed(&mut self) -> bool {
         let val = self.pressed;
         self.pressed = false;
@@ -19,6 +20,7 @@ impl Button {
     }
 }
 pub struct Buttons {
+    /// The "user" pushbutton on the board.
     pub user: Button,
 }
 impl Buttons {
@@ -51,14 +53,26 @@ impl Buttons {
     }
 }
 
+static BUTTONS: ButtonsContainer = ButtonsContainer(Mutex::new(RefCell::new(None)));
+
+/// Convenience wrapper that provides safety guarantees to users of this module.
+/// - A reference to a `ButtonsContainer` object can only be acquired by a function that initialises it.
+/// - Only one `ButtonsContainer` object can be initialised (constructing functions panic otherwise).
+/// - `as_ref` provides a passthrough to the raw `Buttons` that's always valid (always initialised).
 pub struct ButtonsContainer(Mutex<RefCell<Option<Buttons>>>);
 impl ButtonsContainer {
+    /// Runs a function that can interact with a Buttons instance.
     pub fn with_ref<F>(&self, cs: &CriticalSection, f: F)
     where
         F: FnOnce(&mut Buttons),
     {
-        f(self.0.borrow(cs).borrow_mut().as_mut().unwrap())
+        if let Some(buttons) = self.0.borrow(cs).borrow_mut().as_mut() {
+            f(buttons)
+        } else {
+            panic!("buttons used before initialised")
+        }
     }
+    /// Boilerplate reducer that creates a critical section for the user.
     pub fn with_ref_cs<F>(&self, f: F)
     where
         F: FnOnce(&mut Buttons),
@@ -66,12 +80,13 @@ impl ButtonsContainer {
         free(|cs| self.with_ref(cs, f))
     }
 
+    /// Sets the inner `Buttons` value. Can only be called once.
     fn update(&self, cs: &CriticalSection, new_buttons: Buttons) {
-        self.0.borrow(cs).borrow_mut().replace(new_buttons);
+        if let Some(_) = self.0.borrow(cs).borrow_mut().replace(new_buttons) {
+            panic!("ButtonsContainer::update called more than once, programmer error.")
+        }
     }
 }
-
-static BUTTONS: ButtonsContainer = ButtonsContainer(Mutex::new(RefCell::new(None)));
 
 #[interrupt]
 fn EXTI0() {
