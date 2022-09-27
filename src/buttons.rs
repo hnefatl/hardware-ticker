@@ -58,7 +58,7 @@ static BUTTONS: ButtonsContainer = ButtonsContainer(Mutex::new(RefCell::new(None
 /// Convenience wrapper that provides safety guarantees to users of this module.
 /// - A reference to a `ButtonsContainer` object can only be acquired by a function that initialises it.
 /// - Only one `ButtonsContainer` object can be initialised (constructing functions panic otherwise).
-/// - `as_ref` provides a passthrough to the raw `Buttons` that's always valid (always initialised).
+/// - `with_ref` provides a passthrough to the raw `Buttons` that's always valid (always initialised).
 pub struct ButtonsContainer(Mutex<RefCell<Option<Buttons>>>);
 impl ButtonsContainer {
     /// Runs a function that can interact with a Buttons instance.
